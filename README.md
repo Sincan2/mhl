@@ -3,7 +3,7 @@
 > **by MHL TEAM**  
 > Framework eksploitasi interaktif untuk vektor Java Web Console, Apache Tomcat, dan berbagai CVE modern.
 
-![Screenshot](assets/demo.png)
+![Screenshot](demo.png)
 
 ---
 
