@@ -3,8 +3,8 @@
 # =================================================================
 # Sincan2 Interactive Runner
 # Author: MHL TEAM
-# Version: 1.3 (Duck Banner Integration)
-# Deskripsi: Skrip Bash untuk menjalankan sincan2.py dengan menu.
+# Version: 2.0 (Stable Source Code Runner)
+# Deskripsi: Menjalankan sincan2.py secara langsung dari source code.
 # =================================================================
 
 # --- Definisi Warna ---
@@ -17,7 +17,6 @@ NC='\033[0m' # No Color
 
 # --- Fungsi untuk menampilkan menu utama ---
 function show_menu() {
-    # PERUBAHAN: Fungsi banner dihapus, sekarang hanya membersihkan layar
     clear
     echo -e "${YELLOW}================= SINCAN2 RUNNER MENU ===================${NC}"
     echo -e ""
@@ -29,8 +28,8 @@ function show_menu() {
     echo -e "${YELLOW}===========================================================${NC}"
 }
 
-# --- Fungsi untuk menjalankan pemindaian tunggal ---
-function run_single_scan() {
+# --- Fungsi untuk menjalankan pemindaian ---
+function run_scan() {
     local command_to_run=$1
     # Menjalankan skrip python yang akan menampilkan bannernya sendiri
     eval "$command_to_run"
@@ -40,9 +39,7 @@ function run_single_scan() {
 
 # --- Fungsi untuk opsi 1: Target Tunggal ---
 function scan_single_target() {
-    local target_host
-    local timeout=2
-    local extra_flags=""
+    local target_host timeout=2 extra_flags=""
     echo -e "\n--- 🎯 Pindai Target Tunggal ---"
     read -p "  Masukkan IP:PORT target: " target_host
     if [[ -z "$target_host" ]]; then echo -e "${RED}Error: Input tidak boleh kosong!${NC}"; sleep 2; return; fi
@@ -53,8 +50,10 @@ function scan_single_target() {
     if [[ "$auto_exploit" =~ ^[Yy]$ ]]; then extra_flags+=" --auto-exploit"; fi
     read -p "  🔬  Aktifkan pemindaian modern (CVE)? (y/n, default: n): " modern_scan
     if [[ "$modern_scan" =~ ^[Yy]$ ]]; then extra_flags+=" -M"; fi
-    local final_command="python ./sincan2.py -u $target_host --timeout $timeout$extra_flags"
-    run_single_scan "$final_command"
+    
+    # PERBAIKAN UTAMA: Selalu menjalankan source code python3
+    local final_command="./sincan2.py -u $target_host --timeout $timeout$extra_flags"
+    run_scan "$final_command"
 }
 
 # --- Fungsi untuk opsi 2: Target Massal ---
@@ -77,14 +76,11 @@ function scan_mass_target() {
     total_ips=${#all_ips[@]}
     
     if [ "$total_ips" -eq 0 ]; then
-        echo -e "\n${YELLOW}⚠️  File '$filename' kosong. Tidak ada yang dipindai.${NC}"
-        sleep 2
-        return
+        echo -e "\n${YELLOW}⚠️  File '$filename' kosong. Tidak ada yang dipindai.${NC}"; sleep 2; return
     fi
     
-    # Jalankan banner bebek satu kali sebelum loop
-    python ./sincan2.py --help > /dev/null 2>&1 & # Trik untuk menjalankan banner tanpa memproses argumen
-    sleep 4 # Beri waktu animasi selesai
+    # Menjalankan banner python sekali saja
+    ./sincan2.py --help >/dev/null 2>&1
     
     local processed_count=0
     for ip in "${all_ips[@]}"; do
@@ -95,9 +91,9 @@ function scan_mass_target() {
         echo -e "${CYAN}[$processed_count/$total_ips] Memindai target: $target_url${NC}"
         echo -e "${BLUE}===========================================================${NC}"
         
-        local final_command="python ./sincan2.py -u $target_url --timeout $timeout$extra_flags"
+        # PERBAIKAN UTAMA: Selalu menjalankan source code python3
+        local final_command="./sincan2.py -u $target_url --timeout $timeout$extra_flags"
         
-        # Hapus banner dari output utama agar tidak berulang
         scan_output=$(eval "$final_command" | sed '1,2d' | tee /dev/tty)
         
         if echo "$scan_output" | grep -q "\[ SUCCESS \]"; then
@@ -115,8 +111,7 @@ function scan_mass_target() {
 
 # --- Loop Utama Skrip ---
 if [ ! -f "sincan2.py" ]; then
-    echo -e "${RED}Error: File 'sincan2.py' tidak ditemukan di direktori ini.${NC}"
-    echo -e "Pastikan skrip ini dijalankan di lokasi yang sama dengan sincan2.py.${NC}"
+    echo -e "${RED}Error: File 'sincan2.py' tidak ditemukan. Buat ulang file tersebut.${NC}"
     exit 1
 fi
 
