@@ -24,6 +24,7 @@
 - CVE-2023-1397 — DoS 8MB  
 - CVE-2023-6236 — Spoofed JSON  
 - CVE-2025-24813 — Tomcat Path Traversal
+- CVE-2025-31651 - New ADD 11-06-2025
 
 ---
 
