@@ -3,10 +3,8 @@
 # =================================================================
 # Sincan2 Interactive Runner
 # Author: MHL TEAM
-# Version: 1.2 (Stateful Scan)
-# Deskripsi: Skrip Bash untuk menjalankan sincan2.py dengan menu,
-#            menyimpan hasil sukses, dan menghapus IP yang sudah
-#            dipindai.
+# Version: 1.3 (Duck Banner Integration)
+# Deskripsi: Skrip Bash untuk menjalankan sincan2.py dengan menu.
 # =================================================================
 
 # --- Definisi Warna ---
@@ -17,30 +15,14 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# --- Fungsi untuk menampilkan banner ---
-function show_banner() {
-    clear
-    echo -e "${RED}"
-    echo "╔═════════════════════════════════════════════════════════════════╗"
-    echo "║      .___..__ .__ .__    ___________.__..__. .__..__       ║"
-    echo "║      [__][__][__]|  |    \_   _____/|  |[__] |  |[__]      ║"
-    echo "║      |  |[__][__]|  |     |    __)_ |  ||  | |  ||  |      ║"
-    echo "║      |  ||  | \/ |  |____ |        \|  ||  | |  ||  |      ║"
-    echo "║      |__||__|    |_______/_______  /|__||__| |__||__|      ║"
-    echo "║                                \/                         ║"
-    echo "║                                                             ║"
-    echo "║    ${YELLOW}Sincan2 Interactive Runner v1.2 - by MHL TEAM        ${RED}║"
-    echo "╚═════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-}
-
 # --- Fungsi untuk menampilkan menu utama ---
 function show_menu() {
-    show_banner
-    echo -e "${YELLOW}======================= MENU UTAMA ========================${NC}"
+    # PERUBAHAN: Fungsi banner dihapus, sekarang hanya membersihkan layar
+    clear
+    echo -e "${YELLOW}================= SINCAN2 RUNNER MENU ===================${NC}"
     echo -e ""
-    echo -e "  ${CYAN}[1]${NC} 🎯  Scan Satu IP Saja "
-    echo -e "  ${CYAN}[2]${NC} 📂  Scan Massal dari File (dengan state)"
+    echo -e "  ${CYAN}[1]${NC} 🎯  Pindai Target Tunggal"
+    echo -e "  ${CYAN}[2]${NC} 📂  Pindai Massal dari File (dengan state)"
     echo -e ""
     echo -e "  ${RED}[3]${NC} 🚪  Keluar"
     echo -e ""
@@ -50,12 +32,7 @@ function show_menu() {
 # --- Fungsi untuk menjalankan pemindaian tunggal ---
 function run_single_scan() {
     local command_to_run=$1
-    echo -e "\n${YELLOW}-----------------------------------------------------------${NC}"
-    echo -e "${GREEN}🚀 Perintah yang akan dieksekusi:${NC}"
-    echo -e "${CYAN}$command_to_run${NC}"
-    echo -e "${YELLOW}-----------------------------------------------------------${NC}"
-    echo -e "\nTekan [ENTER] untuk memulai..."
-    read
+    # Menjalankan skrip python yang akan menampilkan bannernya sendiri
     eval "$command_to_run"
     echo -e "\n${GREEN}✅ Pemindaian selesai. Tekan [ENTER] untuk kembali ke menu.${NC}"
     read
@@ -80,7 +57,7 @@ function scan_single_target() {
     run_single_scan "$final_command"
 }
 
-# --- Fungsi untuk opsi 2: Target Massal (Logika Baru) ---
+# --- Fungsi untuk opsi 2: Target Massal ---
 function scan_mass_target() {
     local filename port timeout=2 extra_flags="" success_file="berhasil.txt"
     echo -e "\n--- 📂 Pindai Massal dari File ---"
@@ -96,7 +73,6 @@ function scan_mass_target() {
     read -p "  🔬  Aktifkan pemindaian modern (CVE)? (y/n, default: y): " modern_scan
     if [[ ! "$modern_scan" =~ ^[Nn]$ ]]; then extra_flags+=" -M"; fi
 
-    # Baca semua IP ke dalam array untuk diproses
     mapfile -t all_ips < "$filename"
     total_ips=${#all_ips[@]}
     
@@ -106,14 +82,11 @@ function scan_mass_target() {
         return
     fi
     
-    echo -e "\n${YELLOW}-----------------------------------------------------------${NC}"
-    echo -e "${GREEN}🔍 Siap memindai ${total_ips} IP dari file '${filename}'${NC}"
-    echo -e "${YELLOW}-----------------------------------------------------------${NC}"
-    echo -e "\nTekan [ENTER] untuk memulai..."
-    read
-
+    # Jalankan banner bebek satu kali sebelum loop
+    python ./sincan2.py --help > /dev/null 2>&1 & # Trik untuk menjalankan banner tanpa memproses argumen
+    sleep 4 # Beri waktu animasi selesai
+    
     local processed_count=0
-    # Loop melalui array IP
     for ip in "${all_ips[@]}"; do
         ((processed_count++))
         target_url="http://$ip:$port"
@@ -122,20 +95,16 @@ function scan_mass_target() {
         echo -e "${CYAN}[$processed_count/$total_ips] Memindai target: $target_url${NC}"
         echo -e "${BLUE}===========================================================${NC}"
         
-        # Bangun perintah dan jalankan, sambil menangkap outputnya
         local final_command="python ./sincan2.py -u $target_url --timeout $timeout$extra_flags"
         
-        # Gunakan 'tee' untuk menampilkan output secara real-time DAN menangkapnya ke variabel
-        scan_output=$(eval "$final_command" | tee /dev/tty)
+        # Hapus banner dari output utama agar tidak berulang
+        scan_output=$(eval "$final_command" | sed '1,2d' | tee /dev/tty)
         
-        # Periksa apakah ada pesan sukses di dalam output
         if echo "$scan_output" | grep -q "\[ SUCCESS \]"; then
             echo -e "\n${GREEN}🎉 SUKSES! Target berhasil dieksploitasi. Menyimpan ke '$success_file'...${NC}"
             echo "$target_url" >> "$success_file"
         fi
 
-        # Hapus IP yang baru saja dipindai dari file asli menggunakan 'sed'
-        # sed -i '/^...$/d' menghapus baris yang persis cocok
         sed -i "/^${ip}$/d" "$filename"
         echo -e "${YELLOW}🧹 IP '$ip' telah diproses dan dihapus dari '$filename'.${NC}"
     done

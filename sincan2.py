@@ -11,7 +11,7 @@ import datetime
 import signal
 import _exploits
 import _updates
-from os import name, system, path as os_path
+from os import name, system, path as os_path, get_terminal_size
 import os, sys
 from time import sleep
 from random import randint
@@ -25,19 +25,19 @@ try:
     import requests
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 except ImportError:
-    pass # Handled later, but suppress if requests is available
+    pass 
 
 try:
     from urllib3.exceptions import InsecureRequestWarning
     warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 except ImportError:
-    pass # Handled later
+    pass 
 
 # Menonaktifkan pembuatan file log
 logging.captureWarnings(True)
 
 __author__ = "João Filho Matos Figueiredo (Original), Sincan2 (Refactoring)"
-__version__ = "3.3.1 (Fixed Success Logic)"
+__version__ = "3.5.0 (Fast Ducks Banner)"
 
 # Definisi warna
 RED = '\x1b[91m'
@@ -102,7 +102,6 @@ def handler_interrupt(signum, frame):
 
 signal.signal(signal.SIGINT, handler_interrupt)
 
-# --- FUNGSI DARI INTERACT_SHELL.PY DIGABUNGKAN DI SINI ---
 def print_shell_banner(url):
     """Menampilkan banner informasi shell."""
     print(f"\n{BOLD}{GREEN}╔════════════════════════════════════════════════════════════╗")
@@ -159,7 +158,6 @@ def shell_loop(base_url):
             print(f"{RED}Terjadi error tak terduga: {e}{ENDC}")
     print(f"\n{GREEN}Sesi shell dihentikan. Kembali ke program utama...{ENDC}")
 
-# --- FUNGSI UTAMA Sincan2 ---
 def check_vul(url):
     """Fungsi utama untuk memeriksa semua vektor kerentanan."""
     parsed_main_url = urlparse(url)
@@ -232,21 +230,57 @@ def auto_exploit(url, vector):
         print_and_flush(RED + " [ FAILED ] Gagal mengeksploitasi via vektor ini."+ ENDC)
         return False
 
+# PERUBAHAN: Animasi banner dipercepat dan dibuat menjadi dua bebek
 def banner():
-    """Menampilkan banner."""
-    system('cls' if os.name == 'nt' else 'clear')
-    print_and_flush(RED1 + "\n * --- Verify and EXploitation Tool (MOD v3.3) --- *\n"
-                      " |      Versi Mass Scanner & Interaktif          |\n"
-                      " |                                                 |\n"
-                      " | @author:  MHL TEam                                |\n"
-                      " | @refactor: Sincan2 (2025)                         |\n"
-                      " #__________________________________________________#\n" + ENDC)
+    """Menampilkan banner animasi beberapa bebek."""
+    duck_frame_1 = ["   __", "  (o.o)>", "  \\ <_ ", " ~~~\\`"]
+    duck_frame_2 = ["   __", "  (o.o)>", "  / _/ ", " ~~~\\`"]
+    
+    try:
+        width = get_terminal_size().columns
+    except OSError:
+        width = 80 
+    
+    # Animasi berjalan selama ~2 detik (40 frame * 0.05 detik)
+    for step in range(40):
+        system('cls' if name == 'nt' else 'clear')
+        
+        # Bebek 1
+        pos1 = step
+        frame1 = duck_frame_1 if step % 2 == 0 else duck_frame_2
+        # Hanya tampilkan jika masih di dalam layar
+        if pos1 < width - 10:
+            for line in frame1:
+                print(" " * pos1 + line)
+        
+        print() # Spacer antar bebek
+
+        # Bebek 2 (mengikuti di belakang)
+        pos2 = step - 10 
+        if pos2 >= 0 and pos2 < width - 10:
+            frame2 = duck_frame_1 if (step + 1) % 2 == 0 else duck_frame_2
+            for line in frame2:
+                print(" " * pos2 + line)
+
+        sleep(0.05) 
+
+    system('cls' if name == 'nt' else 'clear')
+    title = f"{RED1} * --- Sincan2 Exploit Tool v{__version__} by MHL TEAM --- *{ENDC}"
+    # Perbaikan dari error sebelumnya
+    clean_title_len = len(f" * --- Sincan2 Exploit Tool v{__version__} by MHL TEAM --- *")
+    print_and_flush(title.center(width))
+    print_and_flush(("-".center(clean_title_len, "-")).center(width))
+
 
 if __name__ == "__main__":
-    banner()
+    try:
+        banner()
+    except Exception:
+        pass
+        
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Sincan2 v3.3 (Fixed Success Logic) - Alat verifikasi dan eksploitasi Sincan2.",
+        description=f"Sincan2 v{__version__} - Alat verifikasi dan eksploitasi Sincan2.",
         epilog=textwrap.dedent('''\
         Contoh Penggunaan:
           - Target Tunggal:
@@ -259,7 +293,6 @@ if __name__ == "__main__":
             python %(prog)s -f list_ip.txt -p 8088 --timeout 3
         '''))
     
-    # --- GRUP ARGUMEN BARU UNTUK INPUT TARGET ---
     target_group = parser.add_mutually_exclusive_group(required=True)
     target_group.add_argument("-u", "--host", help="Host target tunggal (contoh: http://127.0.0.1:8080)")
     target_group.add_argument("-f", "--file", help="File yang berisi daftar IP/hostname, satu per baris")
@@ -273,15 +306,13 @@ if __name__ == "__main__":
     
     gl_args = parser.parse_args()
 
-    # --- VALIDASI ARGUMEN ---
     if gl_args.file and not gl_args.port:
         parser.error("-p/--port wajib digunakan bersama -f/--file.")
 
-    # --- MEMPERSIAPKAN DAFTAR TARGET ---
     targets_to_scan = []
     if gl_args.host:
         targets_to_scan.append(gl_args.host)
-    else: # Jika menggunakan file
+    else: 
         if not os_path.exists(gl_args.file):
             print_and_flush(f"{RED}[ERROR] File tidak ditemukan: {gl_args.file}{ENDC}")
             exit(1)
@@ -291,7 +322,6 @@ if __name__ == "__main__":
                 if ip:
                     targets_to_scan.append(f"http://{ip}:{gl_args.port}")
 
-    # --- KONFIGURASI DAN MULAI PEMINDAIAN ---
     configure_http_pool()
     _exploits.set_http_pool(gl_http_pool)
     _updates.set_http_pool(gl_http_pool)
@@ -316,7 +346,6 @@ if __name__ == "__main__":
                 for vector in vulnerables:
                     if exploited: break
                     if "CVE-2025-24813" in vector:
-                        # PERUBAHAN: Menyamakan pesan sukses agar bisa ditangkap oleh shell script
                         print_and_flush(GREEN + f"\n [ SUCCESS ] RCE via {vector} berhasil! Shell tersedia di /mhl.jsp" + ENDC)
                         parsed_url = urlparse(target_url)
                         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
