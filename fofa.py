@@ -7,9 +7,9 @@ import os
 
 # --- KONFIGURASI FOFA ---
 # Ganti dengan email Anda yang terdaftar di FOFA
-FOFA_EMAIL = "moniranayuriani@gmail.com" 
+FOFA_EMAIL = "" 
 # API Key FOFA Anda (SANGAT DISARANKAN MENGGUNAKAN ENVIRONMENT VARIABLE)
-FOFA_KEY = "0892538df2334ace7ebae687e7823ce9" 
+FOFA_KEY = "" 
 
 # Dork yang akan digunakan
 DORK = "jmx-console"
