@@ -1,9 +1,3 @@
-
----
-layout: default
-title: Sincan2 Exploit Tool
----
-
 # 🛠️ Sincan2 Exploit Tool v3.4.1
 
 > **by MHL TEAM**  
@@ -35,7 +29,7 @@ title: Sincan2 Exploit Tool
 ## 📦 Cara Pakai
 
 ```bash
-bash run_sincan2.sh
+bash sodok.sh
 ```
 
 Ikuti menu interaktif:
@@ -65,11 +59,11 @@ Segala penyalahgunaan adalah tanggung jawab pengguna.
 
 ## 🤝 Kontribusi
 
-Silakan kontribusi via pull request, tambahkan CVE baru di modul `_exploits.py`, dan sertakan PoC referensi.
+BY Sincan2 MHL Team.
 
 ---
 
 ## 📫 Kontak
 
-📧 Tim MHL: `security@mhl.local`  
-🔗 GitHub: [github.com/MHL-Team/sincan2](https://github.com/MHL-Team/sincan2)
+📧 Tim MHL: `sincan2@gmail.com`  
+🔗 GitHub: [github.com/sincan2](https://github.com/sincan2)
